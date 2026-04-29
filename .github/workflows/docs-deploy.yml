@@ -1,13 +1,13 @@
 name: Deploy docs to GitHub Pages
 
 on:
-  # Runs on pushes targeting the default branch
-  # TODO(tswast): Update this to only be releases once we confirm it's working.
-  push:
-    branches: ["main"]
-
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Commit-ish to checkout.'
+        required: true
+        type: string
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -22,14 +22,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Build job
+  # Build the docs job
+  #
+  # See also:
+  # https://github.com/googleapis/google-cloud-python/blob/main/.github/workflows/docs.yml
   build:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
+      # Use a fetch-depth of 2 to avoid error `fatal: origin/main...HEAD: no merge base`
+      # See https://github.com/googleapis/google-cloud-python/issues/12013
+      # and https://github.com/actions/checkout#checkout-head.
+      with:
+        fetch-depth: 2
+        repository: 'googleapis/google-cloud-python'
+        ref: ${{ github.event.inputs.tag }}
     - name: Setup Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: "3.13"
     - name: Install nox
@@ -37,12 +47,13 @@ jobs:
         python -m pip install --upgrade setuptools pip wheel
         python -m pip install nox
     - name: Run docs
+      working-directory: ./packages/bigframes
       run: |
         nox -s docs
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
+      uses: actions/upload-pages-artifact@v5
       with:
-        path: docs/_build/html/
+        path: packages/bigframes/docs/_build/html/
 
   # Deployment job
   deploy:
@@ -54,4 +65,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
